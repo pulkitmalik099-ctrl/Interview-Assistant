@@ -559,7 +559,6 @@ if __name__ == "__main__":
     env_silence = float(os.getenv("SILENCE_DURATION", "2.0"))
     silence_duration = args.silence if args.silence is not None else env_silence
     
-    global MOCK_MODE
     MOCK_MODE = args.mock
     
     # Print configuration details
