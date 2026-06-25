@@ -320,11 +320,11 @@ class InterviewCopilotGUI:
             self.log_message("System", "TTS voice feedback disabled.")
 
     def update_content(self, question, answer):
-        # Print logs to Command Prompt console
+        # Print logs to Command Prompt console (Safe plain text without emojis)
         print(f"\n==========================================")
-        print(f"🎤 QUESTION HEARD:\n{question}")
+        print(f"QUESTION HEARD:\n{question}")
         print(f"------------------------------------------")
-        print(f"💡 SUGGESTED ANSWER:\n{answer}")
+        print(f"SUGGESTED ANSWER:\n{answer}")
         print(f"==========================================\n")
 
         # Update Question Label
