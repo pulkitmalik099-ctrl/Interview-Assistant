@@ -320,6 +320,13 @@ class InterviewCopilotGUI:
             self.log_message("System", "TTS voice feedback disabled.")
 
     def update_content(self, question, answer):
+        # Print logs to Command Prompt console
+        print(f"\n==========================================")
+        print(f"🎤 QUESTION HEARD:\n{question}")
+        print(f"------------------------------------------")
+        print(f"💡 SUGGESTED ANSWER:\n{answer}")
+        print(f"==========================================\n")
+
         # Update Question Label
         self.q_text.configure(text=question, font=("Helvetica", 9, "bold"), fg="#CDD6F4")
         
