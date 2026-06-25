@@ -33,6 +33,8 @@ gui_queue = queue.Queue()
 audio_buffer = []
 is_recording = False
 current_rms = 0.0
+MOCK_MODE = False
+
 
 # WDA_EXCLUDEFROMCAPTURE hides the window from Zoom/Teams/Screenshots on Windows
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
@@ -429,6 +431,26 @@ def audio_monitor_thread(device_idx, threshold, silence_duration, samplerate=160
 
 # Gemini API Integration
 def process_audio_with_gemini(audio_data, samplerate):
+    global MOCK_MODE
+    if MOCK_MODE:
+        try:
+            # Simulate natural thinking latency
+            time.sleep(1.5)
+            duration = len(audio_data) / samplerate
+            question_part = f"Mock Question: Did you speak for {duration:.1f} seconds?"
+            answer_part = (
+                f"- **Speech Segment**: Successfully recorded {duration:.1f}s of audio.\n"
+                f"- **VAD State Trigger**: Silence timeout successfully completed the segment.\n"
+                f"- **Auto Copy**: This text was just copied to your clipboard automatically!\n"
+                f"- **Session Logging**: This entry was appended to `interview_session.log`.\n"
+                f"- **Anti-Capture Overlay**: Try screen sharing or taking a screenshot now! The overlay window will be hidden from it."
+            )
+            gui_queue.put(("RESULT", {"question": question_part, "answer": answer_part}))
+            gui_queue.put(("STATUS", {"status": "LISTENING", "color": "#A6E3A1"}))
+        except Exception as e:
+            gui_queue.put(("ERROR", f"Mock Mode Error: {e}"))
+        return
+
     if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
         gui_queue.put(("ERROR", "Gemini API Key not set!\nPlease update the .env file with your GEMINI_API_KEY."))
         return
@@ -491,6 +513,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", "-d", type=str, default=None, help="Audio device ID or name to record from")
     parser.add_argument("--threshold", "-t", type=float, default=None, help="Amplitude threshold to trigger recording")
     parser.add_argument("--silence", "-s", type=float, default=None, help="Silence duration (seconds) to trigger processing")
+    parser.add_argument("--mock", "-m", action="store_true", help="Enable mock mode (offline testing without Gemini API key)")
     
     args = parser.parse_args()
     
@@ -536,11 +559,15 @@ if __name__ == "__main__":
     env_silence = float(os.getenv("SILENCE_DURATION", "2.0"))
     silence_duration = args.silence if args.silence is not None else env_silence
     
+    global MOCK_MODE
+    MOCK_MODE = args.mock
+    
     # Print configuration details
     print("=== Configuration ===")
     print(f"Device: {device_idx if device_idx is not None else 'Default'}")
     print(f"Threshold: {threshold}")
     print(f"Silence Duration: {silence_duration}s")
+    print(f"Mock Mode: {'Enabled' if MOCK_MODE else 'Disabled'}")
     print(f"Gemini API Configured: {'Yes' if GEMINI_API_KEY else 'No (Make sure to update .env)'}")
     print("=====================")
     
