@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import scrolledtext
+from tkinter import filedialog
+import tkinter.messagebox as messagebox
 
 # Load environment variables
 load_dotenv()
@@ -44,6 +46,9 @@ class InterviewCopilotGUI:
         self.font_size = 11
         self.is_compact = False
         
+        # Session history list for export
+        self.history = []
+        
         # Configure Root Window
         self.root.title("AI Interview Copilot")
         self.root.overrideredirect(True)  # Borderless
@@ -51,7 +56,7 @@ class InterviewCopilotGUI:
         self.root.attributes("-alpha", 0.95)  # Glassmorphic transparency
         self.root.configure(bg="#1E1E2E")  # Dark Slate Blue/Purple theme
         
-        # Default geometry: width 400, height 300, positioned at top-right
+        # Default geometry: width 400, height 350, positioned at top-right
         screen_width = self.root.winfo_screenwidth()
         self.normal_width = 400
         self.normal_height = 350
@@ -131,19 +136,23 @@ class InterviewCopilotGUI:
         self.vol_label = tk.Label(self.control_bar, text="Vol:", fg="#7F849C", bg="#1E1E2E", font=("Helvetica", 8))
         self.vol_label.pack(side=tk.LEFT, padx=(10, 2))
         
-        self.vol_canvas = tk.Canvas(self.control_bar, width=80, height=8, bg="#313244", bd=0, highlightthickness=0)
+        self.vol_canvas = tk.Canvas(self.control_bar, width=60, height=8, bg="#313244", bd=0, highlightthickness=0)
         self.vol_canvas.pack(side=tk.LEFT, pady=5)
         self.vol_bar = self.vol_canvas.create_rectangle(0, 0, 0, 8, fill="#A6E3A1")
         
         # Font adjustment buttons
         self.font_dec = tk.Button(self.control_bar, text="A-", command=self.decrease_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 7, "bold"), width=2)
-        self.font_dec.pack(side=tk.RIGHT, padx=2)
+        self.font_dec.pack(side=tk.RIGHT, padx=1)
         
         self.font_inc = tk.Button(self.control_bar, text="A+", command=self.increase_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 7, "bold"), width=2)
-        self.font_inc.pack(side=tk.RIGHT, padx=2)
+        self.font_inc.pack(side=tk.RIGHT, padx=1)
         
+        # Save & Clear Buttons
         self.clear_btn = tk.Button(self.control_bar, text="Clear", command=self.clear_text, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 8), width=5)
-        self.clear_btn.pack(side=tk.RIGHT, padx=10)
+        self.clear_btn.pack(side=tk.RIGHT, padx=3)
+
+        self.save_btn = tk.Button(self.control_bar, text="Save", command=self.save_transcript, bg="#89B4FA", fg="#1E1E2E", bd=0, font=("Helvetica", 8, "bold"), width=5)
+        self.save_btn.pack(side=tk.RIGHT, padx=3)
         
         # 3. Question display pane
         self.question_frame = tk.Frame(self.main_frame, bg="#181825")
@@ -208,7 +217,7 @@ class InterviewCopilotGUI:
     def update_volume(self, rms_val):
         # Normalize RMS (typically 0.0 to 0.1 for speaking)
         val = min(rms_val / (self.threshold * 3), 1.0)
-        width = int(val * 80)
+        width = int(val * 60)
         
         # Change color based on volume compared to threshold
         color = "#F38BA8" if rms_val > self.threshold else "#A6E3A1"
@@ -229,12 +238,66 @@ class InterviewCopilotGUI:
         self.answer_text.insert(tk.END, answer)
         self.answer_text.configure(state=tk.DISABLED)
         
+        # Append to session history for transcript exporting
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        self.history.append({
+            "timestamp": timestamp,
+            "question": question,
+            "answer": answer
+        })
+        
+        # Session Persistence: Auto-save to interview_session.log
+        try:
+            with open("interview_session.log", "a", encoding="utf-8") as f:
+                f.write(f"=== {timestamp} ===\n")
+                f.write(f"QUESTION:\n{question}\n\n")
+                f.write(f"ANSWER:\n{answer}\n")
+                f.write("-" * 50 + "\n\n")
+            self.log_message("Persistence", "Logged response to interview_session.log")
+        except Exception as e:
+            self.log_message("Persistence", f"Error writing log: {e}")
+            
         # Copy to clipboard
         try:
             pyperclip.copy(answer)
         except Exception as e:
             self.log_message("Clipboard", f"Error: {e}")
             
+    def save_transcript(self):
+        """Saves the current session history into a styled text file."""
+        if not self.history:
+            messagebox.showinfo("Save Transcript", "There are no questions/answers in this session yet to save.")
+            return
+            
+        default_filename = f"interview_transcript_{time.strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        # Open standard save file dialog
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            initialfile=default_filename,
+            title="Save Session Transcript"
+        )
+        
+        if file_path:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write("=" * 60 + "\n")
+                    f.write("          AI INTERVIEW COPILOT - SESSION TRANSCRIPT          \n")
+                    f.write(f"Session Date: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 60 + "\n\n")
+                    
+                    for idx, entry in enumerate(self.history, 1):
+                        f.write(f"[Question #{idx}] - Recorded at {entry['timestamp']}\n")
+                        f.write(f"QUESTION:\n{entry['question']}\n\n")
+                        f.write(f"SUGGESTED ANSWER:\n{entry['answer']}\n")
+                        f.write("-" * 60 + "\n\n")
+                        
+                messagebox.showinfo("Save Transcript", f"Transcript successfully saved to:\n{file_path}")
+                self.log_message("System", f"Transcript exported to {file_path}")
+            except Exception as e:
+                messagebox.showerror("Save Transcript", f"Failed to save file: {e}")
+                
     def clear_text(self):
         self.q_text.configure(text="Waiting for question...", font=("Helvetica", 9, "italic"), fg="#BAC2DE")
         self.answer_text.configure(state=tk.NORMAL)
