@@ -13,6 +13,7 @@ import google.generativeai as genai
 import pyperclip
 import pypdf
 import pyttsx3
+import speech_recognition as sr
 from dotenv import load_dotenv
 
 # Import Tkinter for GUI
@@ -38,6 +39,9 @@ current_rms = 0.0
 MOCK_MODE = False
 TTS_ENABLED = False
 CONTEXT_DATA = ""
+stop_audio_event = threading.Event()
+audio_thread = None
+device_idx = None
 
 # WDA_EXCLUDEFROMCAPTURE hides the window from Zoom/Teams/Screenshots on Windows
 WDA_EXCLUDEFROMCAPTURE = 0x00000011
@@ -112,6 +116,70 @@ def load_context_data():
         CONTEXT_DATA = ""
         print("[Context] No custom context files found. Defaulting to general responses.")
     return CONTEXT_DATA
+
+
+def save_settings_to_env(gemini_key, device_id, threshold, silence):
+    try:
+        lines = []
+        if os.path.exists(".env"):
+            with open(".env", "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        
+        keys_to_update = {
+            "GEMINI_API_KEY": gemini_key,
+            "AUDIO_DEVICE_ID": str(device_id),
+            "AUDIO_THRESHOLD": f"{threshold:.4f}" if isinstance(threshold, float) else str(threshold),
+            "SILENCE_DURATION": f"{silence:.1f}" if isinstance(silence, float) else str(silence)
+        }
+        
+        updated_lines = []
+        seen_keys = set()
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#") or "=" not in stripped:
+                updated_lines.append(line)
+                continue
+            
+            key = stripped.split("=")[0].strip()
+            if key in keys_to_update:
+                updated_lines.append(f"{key}={keys_to_update[key]}\n")
+                seen_keys.add(key)
+            else:
+                updated_lines.append(line)
+                
+        for key, val in keys_to_update.items():
+            if key not in seen_keys:
+                updated_lines.append(f"{key}={val}\n")
+                
+        with open(".env", "w", encoding="utf-8") as f:
+            f.writelines(updated_lines)
+            
+        print("[Config] Settings saved to .env file.")
+        return True
+    except Exception as e:
+        print(f"[Config] Error saving to .env: {e}")
+        return False
+
+
+def restart_audio_stream(new_device_idx, new_threshold, new_silence_duration):
+    global audio_thread, stop_audio_event
+    
+    # Signal the old thread to stop
+    stop_audio_event.set()
+    
+    def perform_restart():
+        time.sleep(0.3)  # Give the old thread time to exit
+        stop_audio_event.clear()
+        global audio_thread
+        audio_thread = threading.Thread(
+            target=audio_monitor_thread, 
+            args=(new_device_idx, new_threshold, new_silence_duration), 
+            daemon=True
+        )
+        audio_thread.start()
+        print(f"[System] Audio stream restarted. Device ID: {new_device_idx}, Threshold: {new_threshold}")
+        
+    threading.Thread(target=perform_restart, daemon=True).start()
 
 
 class InterviewCopilotGUI:
@@ -233,6 +301,10 @@ class InterviewCopilotGUI:
         # TTS Button
         self.tts_btn = tk.Button(self.control_bar, text="TTS: OFF", command=self.toggle_tts, bg="#313244", fg="#F38BA8", bd=0, font=("Helvetica", 8, "bold"), width=8)
         self.tts_btn.pack(side=tk.RIGHT, padx=2)
+        
+        # Settings Button
+        self.settings_btn = tk.Button(self.control_bar, text="⚙", command=self.open_settings, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 9, "bold"), width=3)
+        self.settings_btn.pack(side=tk.RIGHT, padx=2)
         
         # 3. Question display pane
         self.question_frame = tk.Frame(self.main_frame, bg="#181825")
@@ -447,6 +519,170 @@ class InterviewCopilotGUI:
             # Run this check every 50ms
             self.root.after(50, self.process_queue)
 
+    def open_settings(self):
+        # Create a new top-level window
+        settings_win = tk.Toplevel(self.root)
+        settings_win.title("Settings")
+        settings_win.geometry("380x360")
+        settings_win.configure(bg="#1E1E2E")
+        settings_win.transient(self.root)  # Keep on top of main window
+        settings_win.grab_set()  # Modal window
+        
+        # Center settings window relative to root
+        rx = self.root.winfo_x()
+        ry = self.root.winfo_y()
+        settings_win.geometry(f"+{rx + 10}+{ry + 30}")
+        
+        # Styles
+        lbl_font = ("Helvetica", 9, "bold")
+        entry_bg = "#11111B"
+        entry_fg = "#CDD6F4"
+        btn_bg = "#313244"
+        btn_fg = "#CDD6F4"
+        
+        # Master frame
+        frame = tk.Frame(settings_win, bg="#1E1E2E", padx=15, pady=15)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        title = tk.Label(frame, text="CONFIGURATION SETTINGS", fg="#89B4FA", bg="#1E1E2E", font=("Helvetica", 11, "bold"))
+        title.pack(pady=(0, 15))
+        
+        # 1. Gemini API Key
+        tk.Label(frame, text="Gemini API Key:", fg="#C8C0E9", bg="#1E1E2E", font=lbl_font, anchor="w").pack(fill=tk.X)
+        key_var = tk.StringVar(value=GEMINI_API_KEY if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" else "")
+        key_entry = tk.Entry(frame, textvariable=key_var, bg=entry_bg, fg=entry_fg, bd=1, relief=tk.FLAT, insertbackground="white", show="*")
+        key_entry.pack(fill=tk.X, pady=(2, 8))
+        
+        # Checkbox to show/hide API key
+        show_key_var = tk.BooleanVar(value=False)
+        def toggle_show_key():
+            if show_key_var.get():
+                key_entry.configure(show="")
+            else:
+                key_entry.configure(show="*")
+        tk.Checkbutton(frame, text="Show API Key", variable=show_key_var, command=toggle_show_key, bg="#1E1E2E", fg="#BAC2DE", activebackground="#1E1E2E", activeforeground="#BAC2DE", font=("Helvetica", 8), bd=0, selectcolor="#1E1E2E").pack(anchor="w", pady=(0, 10))
+        
+        # 2. Audio Device Selection
+        tk.Label(frame, text="Audio Input Device:", fg="#C8C0E9", bg="#1E1E2E", font=lbl_font, anchor="w").pack(fill=tk.X)
+        
+        # Retrieve all input devices
+        devices = sd.query_devices()
+        input_device_options = []
+        input_device_ids = []
+        
+        # Default device indicator
+        default_in_idx = sd.default.device[0]
+        
+        # Find all input devices
+        for idx, d in enumerate(devices):
+            if d['max_input_channels'] > 0:
+                is_def = " (Default)" if idx == default_in_idx else ""
+                name_str = f"ID {idx}: {d['name'][:30]}{is_def}"
+                input_device_options.append(name_str)
+                input_device_ids.append(idx)
+                
+        # Resolve current selection
+        global device_idx
+        current_device_idx = device_idx
+        
+        selected_device_var = tk.StringVar()
+        
+        # Find matching index in list
+        default_sel = "Select Device"
+        if current_device_idx is not None and current_device_idx in input_device_ids:
+            list_idx = input_device_ids.index(current_device_idx)
+            default_sel = input_device_options[list_idx]
+        else:
+            # Try to match the default
+            for i, opt in enumerate(input_device_options):
+                if "(Default)" in opt:
+                    default_sel = opt
+                    break
+        
+        selected_device_var.set(default_sel)
+        
+        device_menu = tk.OptionMenu(frame, selected_device_var, *input_device_options)
+        device_menu.configure(bg=btn_bg, fg=btn_fg, activebackground="#313244", activeforeground="#CDD6F4", bd=1, highlightthickness=0, relief=tk.FLAT)
+        device_menu["menu"].configure(bg="#1E1E2E", fg="#CDD6F4", activebackground="#313244", activeforeground="#CDD6F4")
+        device_menu.pack(fill=tk.X, pady=(2, 10))
+        
+        # 3. Audio Threshold & Silence Duration
+        slider_frame = tk.Frame(frame, bg="#1E1E2E")
+        slider_frame.pack(fill=tk.X, pady=5)
+        
+        # Threshold
+        tk.Label(slider_frame, text="Sensitivity (Threshold):", fg="#C8C0E9", bg="#1E1E2E", font=lbl_font, anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 2))
+        thresh_var = tk.DoubleVar(value=self.threshold)
+        thresh_spin = tk.Spinbox(slider_frame, from_=0.001, to=0.100, increment=0.001, textvariable=thresh_var, bg=entry_bg, fg=entry_fg, width=8, bd=1, buttonbackground=btn_bg)
+        thresh_spin.grid(row=1, column=0, sticky="w", padx=(0, 10))
+        
+        # Silence
+        tk.Label(slider_frame, text="Silence Duration (sec):", fg="#C8C0E9", bg="#1E1E2E", font=lbl_font, anchor="w").grid(row=0, column=1, sticky="w", pady=(0, 2))
+        silence_var = tk.DoubleVar(value=self.silence_duration)
+        silence_spin = tk.Spinbox(slider_frame, from_=0.5, to=5.0, increment=0.5, textvariable=silence_var, bg=entry_bg, fg=entry_fg, width=8, bd=1, buttonbackground=btn_bg)
+        silence_spin.grid(row=1, column=1, sticky="w")
+        
+        # Save Action
+        def save_settings():
+            nonlocal key_var, selected_device_var, thresh_var, silence_var
+            
+            new_key = key_var.get().strip()
+            if not new_key:
+                new_key = "YOUR_GEMINI_API_KEY_HERE"
+                
+            # Parse selected device ID
+            sel_device_str = selected_device_var.get()
+            new_device_id = None
+            if "ID " in sel_device_str:
+                try:
+                    new_device_id = int(sel_device_str.split("ID ")[1].split(":")[0])
+                except:
+                    pass
+            
+            try:
+                new_thresh = float(thresh_var.get())
+                new_silence = float(silence_var.get())
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Threshold and Silence Duration must be numeric.")
+                return
+                
+            # Save to .env
+            success = save_settings_to_env(new_key, new_device_id if new_device_id is not None else "None", new_thresh, new_silence)
+            
+            if success:
+                # Update global config
+                global GEMINI_API_KEY, device_idx
+                GEMINI_API_KEY = new_key
+                if GEMINI_API_KEY and GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE":
+                    genai.configure(api_key=GEMINI_API_KEY)
+                else:
+                    # Clear config if key is empty/default
+                    if hasattr(genai, "configure"):
+                        genai.configure(api_key="")
+                    
+                device_idx = new_device_id
+                self.threshold = new_thresh
+                self.silence_duration = new_silence
+                
+                # Restart audio thread with new config
+                restart_audio_stream(device_idx, self.threshold, self.silence_duration)
+                
+                messagebox.showinfo("Settings Saved", "Settings successfully updated and audio stream re-initialized!")
+                settings_win.destroy()
+            else:
+                messagebox.showerror("Error", "Failed to save settings to .env file.")
+                
+        # Save & Cancel Buttons
+        btn_frame = tk.Frame(frame, bg="#1E1E2E")
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(15, 0))
+        
+        save_btn = tk.Button(btn_frame, text="Save Settings", command=save_settings, bg="#A6E3A1", fg="#1E1E2E", font=("Helvetica", 9, "bold"), bd=0, padx=10, pady=5)
+        save_btn.pack(side=tk.RIGHT, padx=5)
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=settings_win.destroy, bg="#313244", fg="#CDD6F4", font=("Helvetica", 9), bd=0, padx=10, pady=5)
+        cancel_btn.pack(side=tk.RIGHT, padx=5)
+
 
 # Audio Stream Callback
 callback_count = 0
@@ -491,7 +727,7 @@ def audio_monitor_thread(device_idx, threshold, silence_duration, samplerate=160
     try:
         with sd.InputStream(device=device_idx, channels=1, samplerate=samplerate, 
                             blocksize=block_size, callback=audio_callback):
-            while True:
+            while not stop_audio_event.is_set():
                 time.sleep(0.05)
                 
                 # State Machine Processing
@@ -545,24 +781,61 @@ def audio_monitor_thread(device_idx, threshold, silence_duration, samplerate=160
         print(f"[Audio Engine] Stream Error: {e}", file=sys.stderr)
         gui_queue.put(("ERROR", f"Audio stream error: {e}"))
 
-# Gemini API Integration
+# Gemini API Integration & Speech Recognition
 def process_audio_with_gemini(audio_data, samplerate):
-    global MOCK_MODE, CONTEXT_DATA
+    global MOCK_MODE, CONTEXT_DATA, GEMINI_API_KEY
+    
+    # 1. Convert numpy array to WAV bytes in memory
+    try:
+        wav_io = io.BytesIO()
+        sf.write(wav_io, audio_data, samplerate, format='WAV', subtype='PCM_16')
+        audio_bytes = wav_io.getvalue()
+    except Exception as e:
+        print(f"[Audio Write Error] {e}", file=sys.stderr)
+        gui_queue.put(("ERROR", f"Audio processing error: {e}"))
+        return
+
+    # 2. Transcribe locally using speech_recognition (free, no API key required!)
+    transcribed_question = ""
+    try:
+        recognizer = sr.Recognizer()
+        audio_file_like = io.BytesIO(audio_bytes)
+        with sr.AudioFile(audio_file_like) as source:
+            recorded_audio = recognizer.record(source)
+        transcribed_question = recognizer.recognize_google(recorded_audio)
+        print(f"[SpeechRecog] Transcribed Question: {transcribed_question}")
+    except sr.UnknownValueError:
+        print("[SpeechRecog] Google Speech Recognition could not understand audio.")
+        transcribed_question = ""
+    except sr.RequestError as e:
+        print(f"[SpeechRecog Error] Google Request Error: {e}")
+        transcribed_question = ""
+    except Exception as e:
+        print(f"[SpeechRecog Error] {e}")
+        transcribed_question = ""
+
+    # If transcription is completely empty, check if we had any audio
+    if not transcribed_question:
+        transcribed_question = "(No speech recognized or audio too quiet)"
+
+    # 3. Handle Mock Mode
     if MOCK_MODE:
         try:
-            # Simulate natural thinking latency
-            time.sleep(1.5)
+            time.sleep(1.5)  # simulate latency
             duration = len(audio_data) / samplerate
-            question_part = f"Mock Question: Did you speak for {duration:.1f} seconds?"
+            if transcribed_question == "(No speech recognized or audio too quiet)":
+                question_part = f"Mock Question: Did you speak for {duration:.1f} seconds?"
+            else:
+                question_part = f"Transcribed (Mock Mode): {transcribed_question}"
+                
             answer_part = (
                 f"- **Speech Segment**: Successfully recorded {duration:.1f}s of audio.\n"
+                f"- **Transcribed Text**: \"{transcribed_question}\"\n"
                 f"- **VAD State Trigger**: Silence timeout successfully completed the segment.\n"
                 f"- **Auto Copy**: This text was just copied to your clipboard automatically!\n"
                 f"- **Session Logging**: This entry was appended to `interview_session.log`.\n"
                 f"- **Anti-Capture Overlay**: Try screen sharing or taking a screenshot now! The overlay window will be hidden from it."
             )
-            
-            # Show context active inside mock response if files are loaded
             if CONTEXT_DATA:
                 context_preview = CONTEXT_DATA[:150] + "..." if len(CONTEXT_DATA) > 150 else CONTEXT_DATA
                 answer_part += f"\n- **Context Active**: Loaded {len(CONTEXT_DATA)} characters of context. Preview:\n  *{context_preview.strip()}*"
@@ -575,19 +848,22 @@ def process_audio_with_gemini(audio_data, samplerate):
             gui_queue.put(("ERROR", f"Mock Mode Error: {e}"))
         return
 
+    # 4. Real Mode - check API key
     if not GEMINI_API_KEY or GEMINI_API_KEY == "YOUR_GEMINI_API_KEY_HERE":
-        gui_queue.put(("ERROR", "Gemini API Key not set!\nPlease update the .env file with your GEMINI_API_KEY."))
+        # We still show the transcribed question in the GUI!
+        answer_part = (
+            "Gemini API Key not set!\n\n"
+            "Please configure your GEMINI_API_KEY in the Settings (gear button) or "
+            "add it to your `.env` file to generate suggested answers.\n\n"
+            "You can get a free Gemini API Key from:\n"
+            "https://aistudio.google.com/"
+        )
+        gui_queue.put(("RESULT", {"question": transcribed_question, "answer": answer_part}))
+        gui_queue.put(("STATUS", {"status": "LISTENING", "color": "#A6E3A1"}))
         return
 
+    # 5. Call Gemini API using the text transcription (much faster and more robust!)
     try:
-        # 1. Convert numpy array to WAV bytes in memory
-        wav_io = io.BytesIO()
-        sf.write(wav_io, audio_data, samplerate, format='WAV', subtype='PCM_16')
-        audio_bytes = wav_io.getvalue()
-        
-        # 2. Call Gemini model directly with audio data
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
         # Build context prompt
         system_context = ""
         if CONTEXT_DATA:
@@ -598,30 +874,27 @@ def process_audio_with_gemini(audio_data, samplerate):
             )
             
         prompt = (
-            "You are an expert AI interview assistant. The attached audio contains the interviewer's question. "
+            "You are an expert AI interview assistant. The user is in an interview and just heard the following question:\n"
+            f"Question: \"{transcribed_question}\"\n\n"
             "Please perform the following tasks:\n"
-            "1. Transcribe the question accurately.\n"
-            "2. Provide a clear, structured, and professional answer to the question that the candidate can use. "
+            "1. Confirm the transcription or rephrase it slightly for clarity if it contains obvious speech-to-text typos.\n"
+            "2. Provide a clear, structured, and professional suggested answer to this question that the candidate can use. "
             "Keep it concise, direct, and easy to read quickly (e.g., using short bullet points).\n\n"
             f"{system_context}"
             "Format your output EXACTLY as follows:\n\n"
-            "QUESTION: [Transcription of the question]\n"
+            "QUESTION: [Clear/Rephrased question]\n"
             "ANSWER: [Your suggested answer]\n"
         )
         
-        response = model.generate_content([
-            {
-                "mime_type": "audio/wav",
-                "data": audio_bytes
-            },
-            prompt
-        ])
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
+        response = model.generate_content(prompt)
         response_text = response.text
         print(f"[Gemini Response] Raw:\n{response_text}")
         
         # Parse the structured response
-        question_part = "Could not transcribe question clearly."
+        question_part = transcribed_question
         answer_part = response_text
         
         if "QUESTION:" in response_text and "ANSWER:" in response_text:
@@ -638,7 +911,9 @@ def process_audio_with_gemini(audio_data, samplerate):
         
     except Exception as e:
         print(f"[Gemini API Error] {e}", file=sys.stderr)
-        gui_queue.put(("ERROR", f"Gemini API Error: {e}"))
+        # Even on error, show the transcribed question
+        gui_queue.put(("RESULT", {"question": transcribed_question, "answer": f"Gemini API Error: {e}"}))
+        gui_queue.put(("STATUS", {"status": "LISTENING", "color": "#A6E3A1"}))
 
 # Main Entry Point
 if __name__ == "__main__":
