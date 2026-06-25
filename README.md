@@ -74,6 +74,8 @@ stateDiagram-v2
 
 ## ✨ Features
 
+- **📁 Custom Knowledge Base (Resume Scanner)**: Drop text (`.txt`) or PDF (`.pdf`) files (like your resume or project cheat-sheets) into the `./context` folder. The copilot automatically extracts their text on startup and customizes Gemini's responses to fit your exact experience and skills.
+- **🔊 Optional Text-To-Speech (TTS)**: An audio toggle switch (`[TTS: OFF/ON]`) in the overlay control bar lets the app whisper suggested responses directly into your earphones in a background thread using the offline Windows voice synthesizer.
 - **🛡️ Screenshot & Screen-Share Protection**: Uses the Windows display affinity API (`SetWindowDisplayAffinity`) to ensure the window is entirely hidden from Zoom, Teams, Meet, OBS, and screenshots.
 - **⚡ Multimodal Audio-to-Answer**: Sends raw audio bytes directly to the Gemini 2.5 Flash API. This processes transcription and answer generation in a single step for ultra-low latency and higher accuracy.
 - **📋 Automatic Clipboard Copy**: Copies suggested answers to your clipboard immediately upon generation. Simply press `Ctrl + V` to paste.
