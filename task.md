@@ -23,5 +23,13 @@
   - [x] Add `⚙` button to control bar
   - [x] Implement `open_settings` TopLevel dialog with API key, device list dropdown, threshold, and silence duration controls
   - [x] Implement `save_settings_to_env` and auto-restart of the audio monitor stream
-- [/] Verify functionality in mock and real modes
-- [ ] Sync all code changes to GitHub repository
+- [x] Verify functionality in mock and real modes
+- [x] Sync all code changes to GitHub repository
+
+## Phase 3: Auto-Resizing Window & Typography Upgrades
+- [ ] Update GUI layouts to use Segoe UI and set line/paragraph spacing in `create_widgets`
+- [ ] Implement `insert_markdown` method to render bold, bullet points, and headers in `interview_assistant.py`
+- [ ] Implement `fit_window_to_content` method to automatically adjust window height dynamically
+- [ ] Hook window fitting to startup, content updates, and restoration from compact mode
+- [ ] Verify clean rendering and auto-resize in mock/real mode
+- [ ] Sync changes to GitHub

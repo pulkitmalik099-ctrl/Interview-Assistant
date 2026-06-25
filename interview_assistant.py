@@ -221,6 +221,7 @@ class InterviewCopilotGUI:
         
         # Exclude from capture (hide from screen shares)
         self.root.after(100, self.apply_display_affinity)
+        self.root.after(150, self.fit_window_to_content)
         
         # Start queue processing
         self.process_queue()
@@ -254,14 +255,14 @@ class InterviewCopilotGUI:
         self.header = tk.Frame(self.main_frame, bg="#252538", height=30)
         self.header.pack(fill=tk.X)
         
-        self.title_label = tk.Label(self.header, text="🎤 INTERVIEW COPILOT", fg="#C8C0E9", bg="#252538", font=("Helvetica", 9, "bold"))
+        self.title_label = tk.Label(self.header, text="🎤 INTERVIEW COPILOT", fg="#C8C0E9", bg="#252538", font=("Segoe UI", 9, "bold"))
         self.title_label.pack(side=tk.LEFT, padx=10)
         
         # Quick close and minimize buttons
-        self.close_btn = tk.Button(self.header, text="✕", command=self.quit_app, bg="#252538", fg="#F38BA8", bd=0, activebackground="#F38BA8", activeforeground="#1E1E2E", font=("Helvetica", 9, "bold"), width=3)
+        self.close_btn = tk.Button(self.header, text="✕", command=self.quit_app, bg="#252538", fg="#F38BA8", bd=0, activebackground="#F38BA8", activeforeground="#1E1E2E", font=("Segoe UI", 9, "bold"), width=3)
         self.close_btn.pack(side=tk.RIGHT, padx=2)
         
-        self.minimize_btn = tk.Button(self.header, text="⛶", command=self.toggle_compact, bg="#252538", fg="#A6E3A1", bd=0, activebackground="#A6E3A1", activeforeground="#1E1E2E", font=("Helvetica", 9, "bold"), width=3)
+        self.minimize_btn = tk.Button(self.header, text="⛶", command=self.toggle_compact, bg="#252538", fg="#A6E3A1", bd=0, activebackground="#A6E3A1", activeforeground="#1E1E2E", font=("Segoe UI", 9, "bold"), width=3)
         self.minimize_btn.pack(side=tk.RIGHT, padx=2)
         
         # 2. Control & Status Bar
@@ -273,11 +274,11 @@ class InterviewCopilotGUI:
         self.status_bulb.pack(side=tk.LEFT, pady=3)
         self.status_oval = self.status_bulb.create_oval(2, 2, 10, 10, fill="#A6E3A1")  # Green default
         
-        self.status_label = tk.Label(self.control_bar, text="LISTENING", fg="#A6E3A1", bg="#1E1E2E", font=("Helvetica", 8, "bold"))
+        self.status_label = tk.Label(self.control_bar, text="LISTENING", fg="#A6E3A1", bg="#1E1E2E", font=("Segoe UI", 8, "bold"))
         self.status_label.pack(side=tk.LEFT, padx=5)
         
         # Volume meter
-        self.vol_label = tk.Label(self.control_bar, text="Vol:", fg="#7F849C", bg="#1E1E2E", font=("Helvetica", 8))
+        self.vol_label = tk.Label(self.control_bar, text="Vol:", fg="#7F849C", bg="#1E1E2E", font=("Segoe UI", 8))
         self.vol_label.pack(side=tk.LEFT, padx=(5, 2))
         
         self.vol_canvas = tk.Canvas(self.control_bar, width=50, height=8, bg="#313244", bd=0, highlightthickness=0)
@@ -285,45 +286,56 @@ class InterviewCopilotGUI:
         self.vol_bar = self.vol_canvas.create_rectangle(0, 0, 0, 8, fill="#A6E3A1")
         
         # Font adjustment buttons
-        self.font_dec = tk.Button(self.control_bar, text="A-", command=self.decrease_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 7, "bold"), width=2)
+        self.font_dec = tk.Button(self.control_bar, text="A-", command=self.decrease_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Segoe UI", 7, "bold"), width=2)
         self.font_dec.pack(side=tk.RIGHT, padx=1)
         
-        self.font_inc = tk.Button(self.control_bar, text="A+", command=self.increase_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 7, "bold"), width=2)
+        self.font_inc = tk.Button(self.control_bar, text="A+", command=self.increase_font, bg="#313244", fg="#CDD6F4", bd=0, font=("Segoe UI", 7, "bold"), width=2)
         self.font_inc.pack(side=tk.RIGHT, padx=1)
         
         # Clear, Save & TTS Buttons
-        self.clear_btn = tk.Button(self.control_bar, text="Clear", command=self.clear_text, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 8), width=5)
+        self.clear_btn = tk.Button(self.control_bar, text="Clear", command=self.clear_text, bg="#313244", fg="#CDD6F4", bd=0, font=("Segoe UI", 8), width=5)
         self.clear_btn.pack(side=tk.RIGHT, padx=2)
-
-        self.save_btn = tk.Button(self.control_bar, text="Save", command=self.save_transcript, bg="#89B4FA", fg="#1E1E2E", bd=0, font=("Helvetica", 8, "bold"), width=5)
+ 
+        self.save_btn = tk.Button(self.control_bar, text="Save", command=self.save_transcript, bg="#89B4FA", fg="#1E1E2E", bd=0, font=("Segoe UI", 8, "bold"), width=5)
         self.save_btn.pack(side=tk.RIGHT, padx=2)
         
         # TTS Button
-        self.tts_btn = tk.Button(self.control_bar, text="TTS: OFF", command=self.toggle_tts, bg="#313244", fg="#F38BA8", bd=0, font=("Helvetica", 8, "bold"), width=8)
+        self.tts_btn = tk.Button(self.control_bar, text="TTS: OFF", command=self.toggle_tts, bg="#313244", fg="#F38BA8", bd=0, font=("Segoe UI", 8, "bold"), width=8)
         self.tts_btn.pack(side=tk.RIGHT, padx=2)
         
         # Settings Button
-        self.settings_btn = tk.Button(self.control_bar, text="⚙", command=self.open_settings, bg="#313244", fg="#CDD6F4", bd=0, font=("Helvetica", 9, "bold"), width=3)
+        self.settings_btn = tk.Button(self.control_bar, text="⚙", command=self.open_settings, bg="#313244", fg="#CDD6F4", bd=0, font=("Segoe UI", 9, "bold"), width=3)
         self.settings_btn.pack(side=tk.RIGHT, padx=2)
         
         # 3. Question display pane
         self.question_frame = tk.Frame(self.main_frame, bg="#181825")
         self.question_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
         
-        self.q_title = tk.Label(self.question_frame, text="LAST QUESTION:", fg="#89B4FA", bg="#181825", font=("Helvetica", 8, "bold"), anchor="w")
+        self.q_title = tk.Label(self.question_frame, text="LAST QUESTION:", fg="#89B4FA", bg="#181825", font=("Segoe UI", 8, "bold"), anchor="w")
         self.q_title.pack(fill=tk.X, padx=5, pady=2)
         
-        self.q_text = tk.Label(self.question_frame, text="Waiting for question...", fg="#BAC2DE", bg="#181825", font=("Helvetica", 9, "italic"), wraplength=370, justify=tk.LEFT, anchor="w")
+        self.q_text = tk.Label(self.question_frame, text="Waiting for question...", fg="#BAC2DE", bg="#181825", font=("Segoe UI", 9, "italic"), wraplength=370, justify=tk.LEFT, anchor="w")
         self.q_text.pack(fill=tk.X, padx=5, pady=(0, 5))
         
         # 4. Suggested Answer pane (Scrollable)
         self.answer_frame = tk.Frame(self.main_frame, bg="#1E1E2E")
         self.answer_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         
-        self.a_title = tk.Label(self.answer_frame, text="SUGGESTED ANSWER:", fg="#89DCEB", bg="#1E1E2E", font=("Helvetica", 8, "bold"), anchor="w")
+        self.a_title = tk.Label(self.answer_frame, text="SUGGESTED ANSWER:", fg="#89DCEB", bg="#1E1E2E", font=("Segoe UI", 8, "bold"), anchor="w")
         self.a_title.pack(fill=tk.X, pady=(0, 2))
         
-        self.answer_text = scrolledtext.ScrolledText(self.answer_frame, wrap=tk.WORD, bg="#11111B", fg="#CDD6F4", insertbackground="white", bd=0, font=("Helvetica", self.font_size))
+        self.answer_text = scrolledtext.ScrolledText(
+            self.answer_frame, 
+            wrap=tk.WORD, 
+            bg="#11111B", 
+            fg="#CDD6F4", 
+            insertbackground="white", 
+            bd=0, 
+            font=("Segoe UI", self.font_size),
+            spacing1=4,
+            spacing2=3,
+            spacing3=4
+        )
         self.answer_text.pack(fill=tk.BOTH, expand=True)
         self.answer_text.insert(tk.END, "Suggested responses will appear here dynamically in real-time.\n\nTips:\n- Adjust AUDIO_THRESHOLD in .env if it picks up static noise.\n- Make sure your speaker audio device is selected for Zoom/Meet calls.")
         self.answer_text.configure(state=tk.DISABLED)
@@ -358,9 +370,8 @@ class InterviewCopilotGUI:
             self.answer_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
             self.minimize_btn.configure(text="⛶")
             
-            x = self.root.winfo_x()
-            y = self.root.winfo_y()
-            self.root.geometry(f"{self.normal_width}x{self.normal_height}+{x}+{y}")
+            # Resize window to fit content dynamically
+            self.fit_window_to_content()
             
     def set_status(self, status, color):
         self.status_label.configure(text=status, fg=color)
@@ -400,13 +411,10 @@ class InterviewCopilotGUI:
         print(f"==========================================\n")
 
         # Update Question Label
-        self.q_text.configure(text=question, font=("Helvetica", 9, "bold"), fg="#CDD6F4")
+        self.q_text.configure(text=question, font=("Segoe UI", 10, "bold"), fg="#CDD6F4")
         
-        # Update Answer ScrollText
-        self.answer_text.configure(state=tk.NORMAL)
-        self.answer_text.delete(1.0, tk.END)
-        self.answer_text.insert(tk.END, answer)
-        self.answer_text.configure(state=tk.DISABLED)
+        # Update Answer ScrollText with formatted Markdown
+        self.insert_markdown(self.answer_text, answer)
         
         # Append to session history for transcript exporting
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -433,6 +441,9 @@ class InterviewCopilotGUI:
         except Exception as e:
             self.log_message("Clipboard", f"Error: {e}")
             
+        # Automatically resize window to fit the suggested answer height
+        self.fit_window_to_content()
+        
         # Trigger TTS output if active
         speak_text(answer)
             
@@ -472,19 +483,24 @@ class InterviewCopilotGUI:
                 messagebox.showerror("Save Transcript", f"Failed to save file: {e}")
                 
     def clear_text(self):
-        self.q_text.configure(text="Waiting for question...", font=("Helvetica", 9, "italic"), fg="#BAC2DE")
+        self.q_text.configure(text="Waiting for question...", font=("Segoe UI", 9, "italic"), fg="#BAC2DE")
         self.answer_text.configure(state=tk.NORMAL)
         self.answer_text.delete(1.0, tk.END)
         self.answer_text.insert(tk.END, "Suggested responses will appear here dynamically.")
         self.answer_text.configure(state=tk.DISABLED)
+        self.fit_window_to_content()
         
     def increase_font(self):
         self.font_size = min(self.font_size + 1, 20)
-        self.answer_text.configure(font=("Helvetica", self.font_size))
+        self.answer_text.configure(font=("Segoe UI", self.font_size))
+        self.configure_text_tags()
+        self.fit_window_to_content()
         
     def decrease_font(self):
         self.font_size = max(self.font_size - 1, 8)
-        self.answer_text.configure(font=("Helvetica", self.font_size))
+        self.answer_text.configure(font=("Segoe UI", self.font_size))
+        self.configure_text_tags()
+        self.fit_window_to_content()
         
     def quit_app(self):
         self.root.destroy()
@@ -682,6 +698,79 @@ class InterviewCopilotGUI:
         
         cancel_btn = tk.Button(btn_frame, text="Cancel", command=settings_win.destroy, bg="#313244", fg="#CDD6F4", font=("Helvetica", 9), bd=0, padx=10, pady=5)
         cancel_btn.pack(side=tk.RIGHT, padx=5)
+
+    def configure_text_tags(self):
+        self.answer_text.tag_configure("bold", font=("Segoe UI", self.font_size, "bold"), foreground="#C8C0E9")
+        self.answer_text.tag_configure("normal", font=("Segoe UI", self.font_size), foreground="#CDD6F4")
+        self.answer_text.tag_configure("bullet", font=("Segoe UI", self.font_size), lmargin1=15, lmargin2=25)
+        self.answer_text.tag_configure("header", font=("Segoe UI", self.font_size + 2, "bold"), foreground="#89DCEB")
+
+    def insert_markdown(self, text_widget, text):
+        text_widget.configure(state=tk.NORMAL)
+        text_widget.delete(1.0, tk.END)
+        
+        # Setup tags
+        self.configure_text_tags()
+        
+        lines = text.split("\n")
+        # Trim empty leading/trailing lines
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+            
+        for i, line in enumerate(lines):
+            # Check for header
+            if line.strip().startswith("#"):
+                cleaned_line = line.lstrip("#").strip()
+                text_widget.insert(tk.END, cleaned_line, ("header",))
+                if i < len(lines) - 1:
+                    text_widget.insert(tk.END, "\n")
+                continue
+                
+            is_bullet = False
+            if line.strip().startswith("- ") or line.strip().startswith("* "):
+                is_bullet = True
+                cleaned_line = line.strip()[2:]
+                text_widget.insert(tk.END, "  • ", "bold")
+            else:
+                cleaned_line = line
+                
+            parts = cleaned_line.split("**")
+            for idx, part in enumerate(parts):
+                tag = "bold" if idx % 2 == 1 else "normal"
+                line_tags = (tag, "bullet") if is_bullet else (tag,)
+                text_widget.insert(tk.END, part, line_tags)
+                
+            if i < len(lines) - 1:
+                text_widget.insert(tk.END, "\n")
+                
+        text_widget.configure(state=tk.DISABLED)
+
+    def fit_window_to_content(self):
+        if self.is_compact:
+            return
+            
+        # Get count of display lines to adjust Text widget height
+        try:
+            line_count_tuple = self.answer_text.count("1.0", "end", "displaylines")
+            display_lines = line_count_tuple[0] if line_count_tuple else 1
+        except:
+            # Fallback to logical lines
+            display_lines = int(self.answer_text.index('end-1c').split('.')[0])
+            
+        # Limit Text widget height between 5 and 20 lines
+        text_widget_height = min(max(display_lines, 5), 20)
+        self.answer_text.configure(height=text_widget_height)
+        
+        # Update layout and adjust window size
+        self.root.update_idletasks()
+        req_height = self.main_frame.winfo_reqheight()
+        
+        # Keep window position
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        self.root.geometry(f"{self.normal_width}x{req_height}+{x}+{y}")
 
 
 # Audio Stream Callback

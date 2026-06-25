@@ -5,6 +5,7 @@ We have successfully upgraded the AI Interview Copilot by incorporating key feat
 2. **🔊 Optional Text-To-Speech (TTS)**: An audio toggle switch in the overlay control bar to whisper suggested responses into your earphones in a background thread using the offline Windows voice synthesizer.
 3. **🎙️ Free speech-to-text transcription**: Uses Google's free Web Speech API locally (via the `SpeechRecognition` library) to transcribe your questions on the fly with **zero API key requirements or costs**. Your transcribed question is displayed instantly, even in Mock Mode or when the Gemini API key is missing.
 4. **⚙️ Interactive Settings Panel**: A settings gear button (`⚙`) in the control bar allows you to select your audio input device from a dropdown list, paste your Gemini API key securely, and calibrate the VAD threshold/silence duration. Saving settings writes them back to your `.env` file and restarts the audio engine dynamically!
+5. **📐 Auto-Resizing Window & Reader-Friendly Typography**: The overlay window height automatically adjusts to fit suggested answers (up to a reasonable max height), eliminating manual scrolling. Text is rendered using a clean `Segoe UI` font with paragraph line spacing and formatted bold/bullet elements (stripping raw Markdown symbols).
 
 The codebase and launcher are fully synchronized to your repository:
 🔗 [Interview-Assistant Repo](https://github.com/pulkitmalik099-ctrl/Interview-Assistant)
