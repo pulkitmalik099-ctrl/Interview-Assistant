@@ -449,8 +449,10 @@ class InterviewCopilotGUI:
 
 
 # Audio Stream Callback
+callback_count = 0
+
 def audio_callback(indata, frames, time_info, status):
-    global current_rms
+    global current_rms, callback_count
     if status:
         print(f"[Audio Stream Status] {status}", file=sys.stderr)
     
@@ -459,6 +461,12 @@ def audio_callback(indata, frames, time_info, status):
     clean_data = indata - np.mean(indata)
     current_rms = np.sqrt(np.mean(clean_data**2))
     
+    # Log RMS once every second (10 callbacks of 100ms blocksize)
+    callback_count += 1
+    if callback_count >= 10:
+        callback_count = 0
+        print(f"[Live Monitor] Current RMS level: {current_rms:.5f}")
+        
     # Send current volume to GUI queue
     gui_queue.put(("VOLUME", current_rms))
     
